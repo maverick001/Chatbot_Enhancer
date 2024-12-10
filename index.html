@@ -30,8 +30,9 @@
             border-radius: 10px;
             padding: 20px;
             width: 45%;
-            height: 100%;
+            height: 500px;  /* Fixed height */
             overflow-y: auto;
+            scroll-behavior: smooth;  /* Smooth scrolling */
             background-color: rgba(255, 255, 255, 0.9);
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             font-size: 1.2em;  /* Makes all text in chat windows 20% larger */
@@ -185,7 +186,7 @@
     </style>
 </head>
 <body>
-    <h1>Chatbot with Two LLMs</h1>
+    <h1>LLM Playground</h1>
     <div class="select-instruction">Please select LLMs</div>
     
     <div class="model-selectors">
@@ -228,6 +229,9 @@
             const element = document.getElementById(elementId);
             if (element) {
                 element.textContent = text;
+                // Get the window ID from the element ID
+                const windowId = elementId.split('-')[0];
+                autoScroll(windowId);
             } else {
                 console.error(`Element not found: ${elementId}`);
             }
@@ -284,6 +288,7 @@
                 <span class="message-content">${message}</span>
             `;
             document.getElementById(windowId).appendChild(div);
+            autoScroll(windowId);
         }
 
         function appendBotMessage(windowId, sender, message, timestamp, stats = null) {
@@ -296,6 +301,7 @@
                 ${stats ? `<div class="stats">${stats}</div>` : ''}
             `;
             document.getElementById(windowId).appendChild(div);
+            autoScroll(windowId);
         }
 
         function buildFullPrompt(newInput) {
@@ -517,7 +523,29 @@
 
         window.onload = function() {
             fetchAvailableModels();
+            
+            ['window1', 'window2'].forEach(windowId => {
+                const chatWindow = document.getElementById(windowId);
+                chatWindow.addEventListener('scroll', function() {
+                    // User has manually scrolled
+                    this.dataset.userScrolled = true;
+                    
+                    // Reset if scrolled to bottom
+                    if (this.scrollHeight - this.scrollTop === this.clientHeight) {
+                        this.dataset.userScrolled = false;
+                    }
+                });
+            });
         };
+
+        // Add auto-scroll function
+        function autoScroll(windowId) {
+            const chatWindow = document.getElementById(windowId);
+            // Only auto-scroll if user hasn't scrolled up
+            if (chatWindow.scrollHeight - chatWindow.scrollTop === chatWindow.clientHeight) {
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+            }
+        }
     </script>
 </body>
 </html>

@@ -43,9 +43,10 @@ def get_response():
         model1 = data.get("model1", "llama3.2")
         model2 = data.get("model2", "mistral")
         
-        # Add system prompt with token limit
-        system_prompt = """Please provide concise responses limited to approximately 200 tokens. 
-        Keep your answers clear but brief. Consider the conversation history provided when responding."""
+        # Add system prompt with strict 150 token limit
+        system_prompt = """Please provide concise but accurate responses strictly limited within 150 tokens. 
+        Keep your answers clear and brief. Consider the conversation history provided when responding, 
+        but ensure your response does not exceed 150 tokens under any circumstances."""
         
         # Combine system prompt with full conversation history
         complete_prompt = f"{system_prompt}\n\nConversation history:\n{full_prompt}"
@@ -66,7 +67,8 @@ def get_response():
                         "prompt": complete_prompt,
                         "stream": True,
                         "options": {
-                            "num_tokens": 200
+                            "num_tokens": 150,
+                            "temperature": 0.5
                         }
                     },
                     stream=True,
@@ -99,7 +101,8 @@ def get_response():
                         "prompt": complete_prompt,
                         "stream": True,
                         "options": {
-                            "num_tokens": 200
+                            "num_tokens": 150,
+                            "temperature": 0.5
                         }
                     },
                     stream=True,

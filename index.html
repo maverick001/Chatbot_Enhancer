@@ -153,22 +153,47 @@
             width: 100%;
             max-width: 300px;
         }
+
+        .select-instruction {
+            text-align: center;
+            color: #4a5568;
+            margin: 10px 0;
+            font-size: 1.1em;
+            font-style: italic;
+        }
+
+        .model-selectors {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            width: 100%;
+        }
+
+        .model-selector {
+            width: 45%;
+        }
+
+        select {
+            width: 100%;
+            padding: 8px;
+            font-size: 16px;
+            border: 2px solid #90cdf4;
+            border-radius: 8px;
+            background-color: white;
+            max-width: 300px;
+        }
     </style>
 </head>
 <body>
-    <h1>LLM Playground</h1>
+    <h1>Chatbot with Two LLMs</h1>
+    <div class="select-instruction">Please select LLMs</div>
     
-    <!-- Add model selectors -->
     <div class="model-selectors">
         <div class="model-selector">
-            <select id="model1">
-                <option value="">Select LLM for Window 1</option>
-            </select>
+            <select id="model1"></select>
         </div>
         <div class="model-selector">
-            <select id="model2">
-                <option value="">Select LLM for Window 2</option>
-            </select>
+            <select id="model2"></select>
         </div>
     </div>
 
@@ -189,13 +214,14 @@
         function appendMessageStart(windowId, sender, type) {
             const div = document.createElement('div');
             div.className = type;
+            const messageId = `${windowId}-${Date.now()}`;
             div.innerHTML = `
                 <div class="timestamp">${getFormattedDateTime()}</div>
                 <span class="sender-name">${sender}:</span> 
-                <span class="message-content" id="${windowId}-current"></span>
+                <span class="message-content" id="${messageId}"></span>
             `;
             document.getElementById(windowId).appendChild(div);
-            return `${windowId}-current`;
+            return messageId;
         }
 
         function updateMessage(elementId, text) {
@@ -236,15 +262,15 @@
             // Clear both windows first
             clearChatWindows();
             
-            // Display all messages in order
-            conversationHistory.messages.forEach(msg => {
+            // Display all messages in chronological order
+            conversationHistory.messages.forEach((msg, index) => {
                 if (msg.role === 'user') {
                     appendUserMessage("window1", msg.content, msg.timestamp);
                     appendUserMessage("window2", msg.content, msg.timestamp);
                 } else if (msg.role === 'assistant1') {
-                    appendBotMessage("window1", "LLaMA 3.2", msg.content, msg.timestamp, msg.stats);
+                    appendBotMessage("window1", msg.model, msg.content, msg.timestamp, msg.stats);
                 } else if (msg.role === 'assistant2') {
-                    appendBotMessage("window2", "Mistral", msg.content, msg.timestamp, msg.stats);
+                    appendBotMessage("window2", msg.model, msg.content, msg.timestamp, msg.stats);
                 }
             });
         }
@@ -260,7 +286,7 @@
             document.getElementById(windowId).appendChild(div);
         }
 
-        function appendBotMessage(windowId, sender, message, timestamp = getFormattedDateTime(), stats = null) {
+        function appendBotMessage(windowId, sender, message, timestamp, stats = null) {
             const div = document.createElement('div');
             div.className = 'bot-message';
             div.innerHTML = `
@@ -274,16 +300,18 @@
 
         function buildFullPrompt(newInput) {
             let fullPrompt = '';
-            // Build context from conversation history
-            for (const msg of conversationHistory.messages) {
+            
+            // Add previous conversations as context
+            conversationHistory.messages.forEach(msg => {
                 if (msg.role === 'user') {
                     fullPrompt += `User: ${msg.content}\n`;
                 } else if (msg.role === 'assistant1') {
-                    fullPrompt += `LLaMA 3.2: ${msg.content}\n`;
+                    fullPrompt += `${msg.model}: ${msg.content}\n`;
                 } else if (msg.role === 'assistant2') {
-                    fullPrompt += `Mistral: ${msg.content}\n`;
+                    fullPrompt += `${msg.model}: ${msg.content}\n`;
                 }
-            }
+            });
+
             // Add new input
             fullPrompt += `User: ${newInput}`;
             return fullPrompt;
@@ -306,16 +334,19 @@
             const selector1 = document.getElementById('model1');
             const selector2 = document.getElementById('model2');
             
+            // Clear existing options
+            selector1.innerHTML = '';
+            selector2.innerHTML = '';
+            
+            // Add empty first option
+            selector1.add(new Option('', ''));
+            selector2.add(new Option('', ''));
+            
+            // Add model options
             models.forEach(model => {
-                const option1 = new Option(model, model);
-                const option2 = new Option(model, model);
-                selector1.add(option1);
-                selector2.add(option2);
+                selector1.add(new Option(model, model));
+                selector2.add(new Option(model, model));
             });
-
-            // Set default selections
-            selector1.value = 'llama3.2';  // Set your default model
-            selector2.value = 'mistral';   // Set your default model
         }
 
         async function sendPrompt() {
@@ -330,11 +361,17 @@
             const model2 = document.getElementById("model2").value;
             const timestamp = getFormattedDateTime();
 
+            // Add user message to history
+            conversationHistory.messages.push({
+                role: 'user',
+                content: userInput,
+                timestamp: timestamp
+            });
+
             // Display user input in both windows
             appendUserMessage("window1", userInput, timestamp);
             appendUserMessage("window2", userInput, timestamp);
 
-            // Check if either model is not selected
             if (!model1 || !model2) {
                 if (!model1) {
                     appendErrorMessage("window1", "Please select a model");
@@ -342,13 +379,16 @@
                 if (!model2) {
                     appendErrorMessage("window2", "Please select a model");
                 }
-                return; // Stop execution if any model is not selected
+                return;
             }
 
             try {
                 const startTime = Date.now();
                 const model1 = document.getElementById("model1").value;
                 const model2 = document.getElementById("model2").value;
+
+                // Build full prompt with context
+                const fullPrompt = buildFullPrompt(userInput);
                 
                 console.log(`Using models: ${model1} and ${model2}`);
                 
@@ -363,7 +403,7 @@
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        prompt: userInput,  // Changed from fullPrompt to userInput
+                        prompt: fullPrompt,  // Send full conversation context
                         model1: model1,
                         model2: model2
                     })
@@ -423,19 +463,38 @@
                 const endTime = Date.now();
                 const elapsedTime = endTime - startTime;
 
-                // Add stats
+                // Create stats strings
+                const stats1 = `Generated ${tokens.response1} tokens in ${(elapsedTime/1000).toFixed(1)}s (${(tokens.response1/(elapsedTime/1000)).toFixed(1)} tokens/sec)`;
+                const stats2 = `Generated ${tokens.response2} tokens in ${(elapsedTime/1000).toFixed(1)}s (${(tokens.response2/(elapsedTime/1000)).toFixed(1)} tokens/sec)`;
+
+                // Add responses to conversation history with stats
                 if (responses.response1) {
-                    appendStats(response1Id, tokens.response1, elapsedTime);
+                    conversationHistory.messages.push({
+                        role: 'assistant1',
+                        model: model1,
+                        content: responses.response1,
+                        timestamp: getFormattedDateTime(),
+                        stats: stats1
+                    });
                 }
                 if (responses.response2) {
-                    appendStats(response2Id, tokens.response2, elapsedTime);
+                    conversationHistory.messages.push({
+                        role: 'assistant2',
+                        model: model2,
+                        content: responses.response2,
+                        timestamp: getFormattedDateTime(),
+                        stats: stats2
+                    });
                 }
+
+                // Update the messages with stats
+                appendStats(response1Id, tokens.response1, elapsedTime);
+                appendStats(response2Id, tokens.response2, elapsedTime);
 
             } catch (error) {
                 console.error("Error in sendPrompt:", error);
-                const errorMessage = `Error: ${error.message}`;
-                updateMessage(response1Id, errorMessage);
-                updateMessage(response2Id, errorMessage);
+                appendErrorMessage("window1", `Error: ${error.message}`);
+                appendErrorMessage("window2", `Error: ${error.message}`);
             }
         }
 

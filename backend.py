@@ -39,15 +39,18 @@ def get_response():
             app.logger.error("No prompt provided in request")
             return jsonify({"error": "No prompt provided"}), 400
         
-        user_prompt = data.get("prompt")
+        full_prompt = data.get("prompt")  # This now includes conversation history
         model1 = data.get("model1", "llama3.2")
         model2 = data.get("model2", "mistral")
         
         # Add system prompt with token limit
-        system_prompt = "Please provide concise responses limited to approximately 150 tokens. Keep your answers clear but brief."
-        full_prompt = f"{system_prompt}\n\nUser: {user_prompt}"
+        system_prompt = """Please provide concise responses limited to approximately 200 tokens. 
+        Keep your answers clear but brief. Consider the conversation history provided when responding."""
         
-        app.logger.info(f"Received prompt: {user_prompt}")
+        # Combine system prompt with full conversation history
+        complete_prompt = f"{system_prompt}\n\nConversation history:\n{full_prompt}"
+        
+        app.logger.info(f"Received full prompt with history")
         app.logger.info(f"Using models: {model1} and {model2}")
         
         def generate():
@@ -60,10 +63,10 @@ def get_response():
                     OLLAMA_API_BASE, 
                     json={
                         "model": model1,
-                        "prompt": full_prompt,  # Use the prompt with system instruction
+                        "prompt": complete_prompt,
                         "stream": True,
                         "options": {
-                            "num_tokens": 150  # Add token limit parameter
+                            "num_tokens": 200
                         }
                     },
                     stream=True,
@@ -93,10 +96,10 @@ def get_response():
                     OLLAMA_API_BASE, 
                     json={
                         "model": model2,
-                        "prompt": full_prompt,  # Use the prompt with system instruction
+                        "prompt": complete_prompt,
                         "stream": True,
                         "options": {
-                            "num_tokens": 150  # Add token limit parameter
+                            "num_tokens": 200
                         }
                     },
                     stream=True,

@@ -39,11 +39,15 @@ def get_response():
             app.logger.error("No prompt provided in request")
             return jsonify({"error": "No prompt provided"}), 400
         
-        prompt = data.get("prompt")
+        user_prompt = data.get("prompt")
         model1 = data.get("model1", "llama3.2")
         model2 = data.get("model2", "mistral")
         
-        app.logger.info(f"Received prompt: {prompt}")
+        # Add system prompt with token limit
+        system_prompt = "Please provide concise responses limited to approximately 150 tokens. Keep your answers clear but brief."
+        full_prompt = f"{system_prompt}\n\nUser: {user_prompt}"
+        
+        app.logger.info(f"Received prompt: {user_prompt}")
         app.logger.info(f"Using models: {model1} and {model2}")
         
         def generate():
@@ -56,8 +60,11 @@ def get_response():
                     OLLAMA_API_BASE, 
                     json={
                         "model": model1,
-                        "prompt": prompt,
-                        "stream": True
+                        "prompt": full_prompt,  # Use the prompt with system instruction
+                        "stream": True,
+                        "options": {
+                            "num_tokens": 150  # Add token limit parameter
+                        }
                     },
                     stream=True,
                     timeout=30
@@ -86,8 +93,11 @@ def get_response():
                     OLLAMA_API_BASE, 
                     json={
                         "model": model2,
-                        "prompt": prompt,
-                        "stream": True
+                        "prompt": full_prompt,  # Use the prompt with system instruction
+                        "stream": True,
+                        "options": {
+                            "num_tokens": 150  # Add token limit parameter
+                        }
                     },
                     stream=True,
                     timeout=30

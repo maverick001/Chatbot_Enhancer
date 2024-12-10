@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chatbot with Two LLMs</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            background-color: #e6f3ff;
+            background-image: url('data:image/svg+xml;utf8,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><path d="M 10 10 q 40 40 80 80" stroke="%23c6e3ff" stroke-width="2" fill="none"/></svg>');
+            font-family: Arial, sans-serif;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c5282;
+            margin-bottom: 30px;
+        }
+
+        .container {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            height: 65vh;  /* Takes up 65% of viewport height */
+        }
+
+        .chat-window {
+            border: 1px solid #90cdf4;
+            border-radius: 10px;
+            padding: 20px;
+            width: 45%;
+            height: 100%;
+            overflow-y: auto;
+            background-color: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            font-size: 1.2em;  /* Makes all text in chat windows 20% larger */
+        }
+
+        .input-container {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #userInput {
+            width: 70%;
+            padding: 15px;
+            font-size: 16px;
+            border: 2px solid #90cdf4;
+            border-radius: 25px;
+            outline: none;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 16px;
+            background-color: #4299e1;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #2b6cb0;
+        }
+
+        .user-message {
+            color: #2c5282;
+            margin-bottom: 10px;
+            padding: 8px;
+            background-color: #ebf8ff;
+            border-radius: 8px;
+        }
+
+        .bot-message {
+            color: #2a4365;
+            margin-bottom: 10px;
+            padding: 8px;
+            background-color: #e6fffa;
+            border-radius: 8px;
+        }
+
+        .error-message {
+            color: #c53030;
+            margin-bottom: 10px;
+            padding: 8px;
+            background-color: #fff5f5;
+            border-radius: 8px;
+        }
+
+        .sender-name {
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #1a365d;
+        }
+
+        .message-content {
+            font-size: 0.95em;
+            margin-left: 5px;
+        }
+
+        .stats {
+            font-size: 0.8em;
+            color: #e53e3e !important;  /* Added !important to ensure the red color is applied */
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        /* Alternative specific selector if you want to avoid !important */
+        .chat-window .stats {
+            color: #e53e3e;
+        }
+
+        .timestamp {
+            font-size: 0.64em;  /* Made 20% smaller (0.8 * 0.8 = 0.64) */
+            color: #993366;
+            margin-bottom: 2px;
+            font-style: italic;
+        }
+
+        .user-message, .bot-message {
+            margin-bottom: 15px;
+            padding: 8px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chatbot with Two LLMs</h1>
+    <div class="container">
+        <div class="chat-window" id="window1"></div>
+        <div class="chat-window" id="window2"></div>
+    </div>
+    <div class="input-container">
+        <input type="text" id="userInput" placeholder="Enter your prompt">
+        <button onclick="sendPrompt()">Send</button>
+    </div>
+
+    <script>
+        let conversationHistory = {
+            messages: []
+        };
+
+        function getFormattedDateTime() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            return `${year}-${month}-${day}, ${time}`;
+        }
+
+        function clearChatWindows() {
+            document.getElementById("window1").innerHTML = '';
+            document.getElementById("window2").innerHTML = '';
+        }
+
+        function displayEntireConversation() {
+            // Clear both windows first
+            clearChatWindows();
+            
+            // Display all messages in order
+            conversationHistory.messages.forEach(msg => {
+                if (msg.role === 'user') {
+                    appendUserMessage("window1", msg.content, msg.timestamp);
+                    appendUserMessage("window2", msg.content, msg.timestamp);
+                } else if (msg.role === 'assistant1') {
+                    appendBotMessage("window1", "LLaMA 3.2", msg.content, msg.timestamp, msg.stats);
+                } else if (msg.role === 'assistant2') {
+                    appendBotMessage("window2", "Mistral", msg.content, msg.timestamp, msg.stats);
+                }
+            });
+        }
+
+        function appendUserMessage(windowId, message, timestamp = getFormattedDateTime()) {
+            const div = document.createElement('div');
+            div.className = 'user-message';
+            div.innerHTML = `
+                <div class="timestamp">${timestamp}</div>
+                <span class="sender-name">You:</span> 
+                <span class="message-content">${message}</span>
+            `;
+            document.getElementById(windowId).appendChild(div);
+        }
+
+        function appendBotMessage(windowId, sender, message, timestamp = getFormattedDateTime(), stats = null) {
+            const div = document.createElement('div');
+            div.className = 'bot-message';
+            div.innerHTML = `
+                <div class="timestamp">${timestamp}</div>
+                <span class="sender-name">${sender}:</span> 
+                <span class="message-content">${message}</span>
+                ${stats ? `<div class="stats">${stats}</div>` : ''}
+            `;
+            document.getElementById(windowId).appendChild(div);
+        }
+
+        function buildFullPrompt(newInput) {
+            let fullPrompt = '';
+            // Build context from conversation history
+            for (const msg of conversationHistory.messages) {
+                if (msg.role === 'user') {
+                    fullPrompt += `User: ${msg.content}\n`;
+                } else if (msg.role === 'assistant1') {
+                    fullPrompt += `LLaMA 3.2: ${msg.content}\n`;
+                } else if (msg.role === 'assistant2') {
+                    fullPrompt += `Mistral: ${msg.content}\n`;
+                }
+            }
+            // Add new input
+            fullPrompt += `User: ${newInput}`;
+            return fullPrompt;
+        }
+
+        async function sendPrompt() {
+            const userInput = document.getElementById("userInput").value;
+            if (!userInput.trim()) return;
+
+            // Clear input immediately
+            document.getElementById("userInput").value = "";
+
+            const timestamp = getFormattedDateTime();
+
+            // Add user message to conversation history
+            conversationHistory.messages.push({
+                role: 'user',
+                content: userInput,
+                timestamp: timestamp
+            });
+
+            // Redisplay entire conversation including new user message
+            displayEntireConversation();
+
+            try {
+                const startTime = Date.now();
+                const fullPrompt = buildFullPrompt(userInput);
+
+                // Make the API call with full context
+                const response = await fetch("/get_response", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({prompt: fullPrompt})
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const reader = response.body.getReader();
+                let responses = { response1: "", response2: "" };
+                let tokens = { response1: 0, response2: 0 };
+
+                while (true) {
+                    const {value, done} = await reader.read();
+                    if (done) break;
+                    
+                    const text = new TextDecoder().decode(value);
+                    const lines = text.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                
+                                if (data.response1) {
+                                    responses.response1 = data.response1;
+                                    tokens.response1 = (data.response1.match(/\b\w+\b/g) || []).length;
+                                }
+                                if (data.response2) {
+                                    responses.response2 = data.response2;
+                                    tokens.response2 = (data.response2.match(/\b\w+\b/g) || []).length;
+                                }
+                                // Redisplay entire conversation with current progress
+                                displayEntireConversation();
+                            } catch (e) {
+                                console.error("Error parsing JSON from stream:", e);
+                            }
+                        }
+                    }
+                }
+
+                const endTime = Date.now();
+                const elapsedTime = endTime - startTime;
+
+                // Create stats strings
+                const stats1 = `Generated ${tokens.response1} tokens in ${(elapsedTime/1000).toFixed(1)}s (${(tokens.response1/(elapsedTime/1000)).toFixed(1)} tokens/sec)`;
+                const stats2 = `Generated ${tokens.response2} tokens in ${(elapsedTime/1000).toFixed(1)}s (${(tokens.response2/(elapsedTime/1000)).toFixed(1)} tokens/sec)`;
+
+                // Add responses to conversation history with stats
+                if (responses.response1) {
+                    conversationHistory.messages.push({
+                        role: 'assistant1',
+                        content: responses.response1,
+                        timestamp: getFormattedDateTime(),
+                        stats: stats1
+                    });
+                }
+                if (responses.response2) {
+                    conversationHistory.messages.push({
+                        role: 'assistant2',
+                        content: responses.response2,
+                        timestamp: getFormattedDateTime(),
+                        stats: stats2
+                    });
+                }
+
+                // Final display of entire conversation
+                displayEntireConversation();
+
+            } catch (error) {
+                const errorMessage = `Error: ${error.message}`;
+                conversationHistory.messages.push({
+                    role: 'error',
+                    content: errorMessage,
+                    timestamp: getFormattedDateTime()
+                });
+                displayEntireConversation();
+            }
+        }
+
+        document.getElementById("userInput").addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                sendPrompt();
+            }
+        });
+    </script>
+</body>
+</html>

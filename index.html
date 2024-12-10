@@ -90,11 +90,10 @@
         }
 
         .error-message {
-            color: #c53030;
-            margin-bottom: 10px;
+            margin: 10px 0;
             padding: 8px;
-            background-color: #fff5f5;
-            border-radius: 8px;
+            color: #ff0000;
+            font-weight: bold;
         }
 
         .sender-name {
@@ -326,10 +325,25 @@
             // Clear input field
             document.getElementById("userInput").value = "";
 
-            // Display user input in both windows first
+            // Check models and display user input
+            const model1 = document.getElementById("model1").value;
+            const model2 = document.getElementById("model2").value;
             const timestamp = getFormattedDateTime();
+
+            // Display user input in both windows
             appendUserMessage("window1", userInput, timestamp);
             appendUserMessage("window2", userInput, timestamp);
+
+            // Check if either model is not selected
+            if (!model1 || !model2) {
+                if (!model1) {
+                    appendErrorMessage("window1", "Please select a model");
+                }
+                if (!model2) {
+                    appendErrorMessage("window2", "Please select a model");
+                }
+                return; // Stop execution if any model is not selected
+            }
 
             try {
                 const startTime = Date.now();
@@ -423,6 +437,17 @@
                 updateMessage(response1Id, errorMessage);
                 updateMessage(response2Id, errorMessage);
             }
+        }
+
+        // Add this new function for error messages
+        function appendErrorMessage(windowId, message) {
+            const div = document.createElement('div');
+            div.className = 'error-message';
+            div.innerHTML = `
+                <div class="timestamp">${getFormattedDateTime()}</div>
+                <span class="message-content" style="color: #ff0000;">${message}</span>
+            `;
+            document.getElementById(windowId).appendChild(div);
         }
 
         document.getElementById("userInput").addEventListener("keypress", function(event) {

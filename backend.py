@@ -36,17 +36,21 @@ def get_response():
     try:
         data = request.json
         if not data or 'prompt' not in data:
+            app.logger.error("No prompt provided in request")
             return jsonify({"error": "No prompt provided"}), 400
         
         prompt = data.get("prompt")
-        model1 = data.get("model1", "llama3.2")  # Default fallback
-        model2 = data.get("model2", "mistral")   # Default fallback
+        model1 = data.get("model1", "llama3.2")
+        model2 = data.get("model2", "mistral")
         
         app.logger.info(f"Received prompt: {prompt}")
+        app.logger.info(f"Using models: {model1} and {model2}")
         
         def generate():
+            responses = {"response1": "", "response2": ""}
+            
             # Get response from first model
-            app.logger.info(f"Calling {model1} model...")
+            app.logger.info(f"Starting call to {model1} model...")
             try:
                 response1 = requests.post(
                     OLLAMA_API_BASE, 
@@ -55,22 +59,28 @@ def get_response():
                         "prompt": prompt,
                         "stream": True
                     },
-                    stream=True
+                    stream=True,
+                    timeout=30
                 )
-                response1_text = ""
+                app.logger.info(f"{model1} API call successful")
+                
                 for line in response1.iter_lines():
                     if line:
-                        json_response = json.loads(line)
-                        response1_text += json_response.get('response', '')
-                        yield f"data: {json.dumps({'response1': response1_text})}\n\n"
-
+                        try:
+                            json_response = json.loads(line)
+                            chunk = json_response.get('response', '')
+                            responses["response1"] += chunk
+                            app.logger.debug(f"Streaming chunk from {model1}")
+                            yield f"data: {json.dumps(responses)}\n\n"
+                        except json.JSONDecodeError as e:
+                            app.logger.error(f"JSON decode error for {model1}: {str(e)}")
+                            
             except requests.exceptions.RequestException as e:
                 app.logger.error(f"Error calling {model1}: {str(e)}")
                 yield f"data: {json.dumps({'error': f'Error with {model1}: {str(e)}'})}\n\n"
-                return
 
             # Get response from second model
-            app.logger.info(f"Calling {model2} model...")
+            app.logger.info(f"Starting call to {model2} model...")
             try:
                 response2 = requests.post(
                     OLLAMA_API_BASE, 
@@ -79,19 +89,27 @@ def get_response():
                         "prompt": prompt,
                         "stream": True
                     },
-                    stream=True
+                    stream=True,
+                    timeout=30
                 )
-                response2_text = ""
+                app.logger.info(f"{model2} API call successful")
+                
                 for line in response2.iter_lines():
                     if line:
-                        json_response = json.loads(line)
-                        response2_text += json_response.get('response', '')
-                        yield f"data: {json.dumps({'response2': response2_text})}\n\n"
-
+                        try:
+                            json_response = json.loads(line)
+                            chunk = json_response.get('response', '')
+                            responses["response2"] += chunk
+                            app.logger.debug(f"Streaming chunk from {model2}")
+                            yield f"data: {json.dumps(responses)}\n\n"
+                        except json.JSONDecodeError as e:
+                            app.logger.error(f"JSON decode error for {model2}: {str(e)}")
+                            
             except requests.exceptions.RequestException as e:
                 app.logger.error(f"Error calling {model2}: {str(e)}")
                 yield f"data: {json.dumps({'error': f'Error with {model2}: {str(e)}'})}\n\n"
-                return
+
+            app.logger.info("Completed streaming both responses")
 
         return Response(generate(), mimetype='text/event-stream')
         

@@ -183,6 +183,38 @@
             messages: []
         };
 
+        function appendMessageStart(windowId, sender, type) {
+            const div = document.createElement('div');
+            div.className = type;
+            div.innerHTML = `
+                <div class="timestamp">${getFormattedDateTime()}</div>
+                <span class="sender-name">${sender}:</span> 
+                <span class="message-content" id="${windowId}-current"></span>
+            `;
+            document.getElementById(windowId).appendChild(div);
+            return `${windowId}-current`;
+        }
+
+        function updateMessage(elementId, text) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.textContent = text;
+            } else {
+                console.error(`Element not found: ${elementId}`);
+            }
+        }
+
+        function appendStats(elementId, tokens, time) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                const statsDiv = document.createElement('div');
+                statsDiv.className = 'stats';
+                const tokensPerSecond = (tokens / (time / 1000)).toFixed(1);
+                statsDiv.textContent = `Generated ${tokens} tokens in ${(time/1000).toFixed(1)}s (${tokensPerSecond} tokens/sec)`;
+                element.parentElement.appendChild(statsDiv);
+            }
+        }
+
         function getFormattedDateTime() {
             const now = new Date();
             const year = now.getFullYear();
@@ -287,36 +319,33 @@
             const userInput = document.getElementById("userInput").value;
             if (!userInput.trim()) return;
 
-            const model1 = document.getElementById("model1").value;
-            const model2 = document.getElementById("model2").value;
-
-            // Clear input immediately
+            // Clear input field
             document.getElementById("userInput").value = "";
 
+            // Display user input in both windows first
             const timestamp = getFormattedDateTime();
-
-            // Add user message to conversation history
-            conversationHistory.messages.push({
-                role: 'user',
-                content: userInput,
-                timestamp: timestamp
-            });
-
-            // Redisplay entire conversation including new user message
-            displayEntireConversation();
+            appendUserMessage("window1", userInput, timestamp);
+            appendUserMessage("window2", userInput, timestamp);
 
             try {
                 const startTime = Date.now();
-                const fullPrompt = buildFullPrompt(userInput);
+                const model1 = document.getElementById("model1").value;
+                const model2 = document.getElementById("model2").value;
+                
+                console.log(`Using models: ${model1} and ${model2}`);
+                
+                // Start response containers
+                const response1Id = appendMessageStart("window1", model1, "bot-message");
+                const response2Id = appendMessageStart("window2", model2, "bot-message");
 
-                // Make the API call with full context
+                console.log("Making API call...");
                 const response = await fetch("/get_response", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        prompt: fullPrompt,
+                        prompt: userInput,  // Changed from fullPrompt to userInput
                         model1: model1,
                         model2: model2
                     })
@@ -326,34 +355,48 @@
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
+                console.log("Starting to read stream...");
                 const reader = response.body.getReader();
                 let responses = { response1: "", response2: "" };
                 let tokens = { response1: 0, response2: 0 };
 
                 while (true) {
                     const {value, done} = await reader.read();
-                    if (done) break;
+                    if (done) {
+                        console.log("Stream complete");
+                        break;
+                    }
                     
                     const text = new TextDecoder().decode(value);
+                    console.log("Received chunk:", text);  // Debug log
+                    
                     const lines = text.split('\n');
                     
                     for (const line of lines) {
                         if (line.startsWith('data: ')) {
                             try {
                                 const data = JSON.parse(line.slice(6));
+                                console.log("Parsed data:", data);  // Debug log
                                 
-                                if (data.response1) {
+                                if (data.error) {
+                                    console.error("Server error:", data.error);
+                                    updateMessage(response1Id, "Error: " + data.error);
+                                    updateMessage(response2Id, "Error: " + data.error);
+                                    continue;
+                                }
+                                
+                                if (data.response1 !== undefined) {
                                     responses.response1 = data.response1;
                                     tokens.response1 = (data.response1.match(/\b\w+\b/g) || []).length;
+                                    updateMessage(response1Id, responses.response1);
                                 }
-                                if (data.response2) {
+                                if (data.response2 !== undefined) {
                                     responses.response2 = data.response2;
                                     tokens.response2 = (data.response2.match(/\b\w+\b/g) || []).length;
+                                    updateMessage(response2Id, responses.response2);
                                 }
-                                // Redisplay entire conversation with current progress
-                                displayEntireConversation();
                             } catch (e) {
-                                console.error("Error parsing JSON from stream:", e);
+                                console.error("Error parsing JSON from stream:", e, line);
                             }
                         }
                     }
@@ -362,39 +405,19 @@
                 const endTime = Date.now();
                 const elapsedTime = endTime - startTime;
 
-                // Create stats strings
-                const stats1 = `Generated ${tokens.response1} tokens in ${(elapsedTime/1000).toFixed(1)}s (${(tokens.response1/(elapsedTime/1000)).toFixed(1)} tokens/sec)`;
-                const stats2 = `Generated ${tokens.response2} tokens in ${(elapsedTime/1000).toFixed(1)}s (${(tokens.response2/(elapsedTime/1000)).toFixed(1)} tokens/sec)`;
-
-                // Add responses to conversation history with stats
+                // Add stats
                 if (responses.response1) {
-                    conversationHistory.messages.push({
-                        role: 'assistant1',
-                        content: responses.response1,
-                        timestamp: getFormattedDateTime(),
-                        stats: stats1
-                    });
+                    appendStats(response1Id, tokens.response1, elapsedTime);
                 }
                 if (responses.response2) {
-                    conversationHistory.messages.push({
-                        role: 'assistant2',
-                        content: responses.response2,
-                        timestamp: getFormattedDateTime(),
-                        stats: stats2
-                    });
+                    appendStats(response2Id, tokens.response2, elapsedTime);
                 }
 
-                // Final display of entire conversation
-                displayEntireConversation();
-
             } catch (error) {
+                console.error("Error in sendPrompt:", error);
                 const errorMessage = `Error: ${error.message}`;
-                conversationHistory.messages.push({
-                    role: 'error',
-                    content: errorMessage,
-                    timestamp: getFormattedDateTime()
-                });
-                displayEntireConversation();
+                updateMessage(response1Id, errorMessage);
+                updateMessage(response2Id, errorMessage);
             }
         }
 

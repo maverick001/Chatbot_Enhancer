@@ -20,9 +20,14 @@
 
         .container {
             display: flex;
-            justify-content: space-around;
-            margin-top: 20px;
-            height: 65vh;  /* Takes up 65% of viewport height */
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .chat-windows {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
         }
 
         .chat-window {
@@ -183,6 +188,45 @@
             background-color: white;
             max-width: 300px;
         }
+
+        .summary-window {
+            width: 100%;
+            height: 250px;
+            border: 2px solid #90cdf4;
+            border-radius: 8px;
+            padding: 15px;
+            overflow-y: auto;
+            background-color: #f8fafc;
+            margin-top: 20px;
+        }
+
+        .summary-title {
+            text-align: center;
+            color: #4a5568;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+
+        .summary-header {
+            margin-bottom: 15px;
+            border-bottom: 1px solid #90cdf4;
+            padding-bottom: 10px;
+        }
+
+        .summary-title {
+            font-weight: bold;
+            color: #2b6cb0;
+            margin: 5px 0;
+        }
+
+        .summary-content {
+            line-height: 1.6;
+            padding: 10px;
+            font-size: 1.1em;
+            color: #2d3748;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
     </style>
 </head>
 <body>
@@ -199,8 +243,12 @@
     </div>
 
     <div class="container">
-        <div class="chat-window" id="window1"></div>
-        <div class="chat-window" id="window2"></div>
+        <div class="chat-windows">
+            <div class="chat-window" id="window1"></div>
+            <div class="chat-window" id="window2"></div>
+        </div>
+        <div class="summary-title">Common Ground Summary</div>
+        <div class="summary-window" id="summary-window"></div>
     </div>
     <div class="input-container">
         <input type="text" id="userInput" placeholder="Enter your prompt">
@@ -497,6 +545,11 @@
                 appendStats(response1Id, tokens.response1, elapsedTime);
                 appendStats(response2Id, tokens.response2, elapsedTime);
 
+                // After both responses are complete
+                if (responses.response1 && responses.response2) {
+                    await generateSummary(responses.response1, responses.response2, userInput);
+                }
+
             } catch (error) {
                 console.error("Error in sendPrompt:", error);
                 appendErrorMessage("window1", `Error: ${error.message}`);
@@ -544,6 +597,93 @@
             // Only auto-scroll if user hasn't scrolled up
             if (chatWindow.scrollHeight - chatWindow.scrollTop === chatWindow.clientHeight) {
                 chatWindow.scrollTop = chatWindow.scrollHeight;
+            }
+        }
+
+        // Add function to handle summary
+        async function generateSummary(response1, response2, originalQuestion) {
+            const summaryPrompt = `I have two AI responses to the question "${originalQuestion}":
+
+Answer 1:
+${response1}
+
+Answer 2:
+${response2}
+
+Please analyze these responses and provide a natural, well-written synthesis that:
+1. Focuses on the common points between both answers
+2. Discards any contradicting or unique points
+3. Presents the information in a flowing, coherent paragraph
+4. Maintains clarity and readability`;
+
+            try {
+                const response = await fetch("/get_summary", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        prompt: summaryPrompt
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const reader = response.body.getReader();
+                let summaryText = '';
+                const summaryWindow = document.getElementById('summary-window');
+                
+                // Add styling for better readability
+                summaryWindow.innerHTML = `
+                    <div class="summary-header">
+                        <div class="timestamp">${getFormattedDateTime()}</div>
+                        <div class="summary-title">Synthesis of Common Points</div>
+                    </div>
+                    <div class="summary-content"></div>
+                `;
+                const summaryContent = summaryWindow.querySelector('.summary-content');
+
+                while (true) {
+                    const {value, done} = await reader.read();
+                    if (done) break;
+                    
+                    const text = new TextDecoder().decode(value);
+                    const lines = text.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                if (data.error) {
+                                    summaryContent.innerHTML = `<div class="error-message">${data.error}</div>`;
+                                    continue;
+                                }
+                                if (data.summary) {
+                                    summaryText += data.summary;
+                                    // Clean up any JSON artifacts and format nicely
+                                    const cleanText = summaryText
+                                        .replace(/\\n/g, ' ')
+                                        .replace(/\\/g, '')
+                                        .replace(/"{/g, '')
+                                        .replace(/}"/g, '')
+                                        .replace(/["{}]/g, '')
+                                        .trim();
+                                    summaryContent.textContent = cleanText;
+                                    autoScroll('summary-window');
+                                }
+                            } catch (e) {
+                                console.error("Error parsing summary JSON:", e);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("Error generating summary:", error);
+                document.getElementById('summary-window').innerHTML = `
+                    <div class="error-message">Error generating summary: ${error.message}</div>
+                `;
             }
         }
     </script>

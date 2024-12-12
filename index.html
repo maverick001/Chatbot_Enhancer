@@ -227,18 +227,36 @@
             white-space: pre-wrap;
             word-wrap: break-word;
         }
+
+        .error-message {
+            color: red;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #ffe6e6;
+            border: 1px solid #ff9999;
+            border-radius: 4px;
+        }
+        .model-selector {
+            margin: 10px 0;
+        }
+        select {
+            padding: 5px;
+            width: 200px;
+        }
     </style>
 </head>
 <body>
     <h1>LLM Playground</h1>
     <div class="select-instruction">Please select LLMs</div>
     
-    <div class="model-selectors">
-        <div class="model-selector">
-            <select id="model1"></select>
-        </div>
-        <div class="model-selector">
-            <select id="model2"></select>
+    <div class="controls">
+        <div class="model-selectors">
+            <select id="model1" class="model-dropdown">
+                <option value="">Select Model 1</option>
+            </select>
+            <select id="model2" class="model-dropdown">
+                <option value="">Select Model 2</option>
+            </select>
         </div>
     </div>
 
@@ -260,12 +278,14 @@
             messages: []
         };
 
-        function appendMessageStart(windowId, sender, type) {
+        let availableModels = [];
+
+        function appendMessageStart(windowId, sender, className, messageId) {
             const div = document.createElement('div');
-            div.className = type;
-            const messageId = `${windowId}-${Date.now()}`;
+            div.className = className;
+            const timestamp = getFormattedDateTime();
             div.innerHTML = `
-                <div class="timestamp">${getFormattedDateTime()}</div>
+                <div class="timestamp">${timestamp}</div>
                 <span class="sender-name">${sender}:</span> 
                 <span class="message-content" id="${messageId}"></span>
             `;
@@ -277,11 +297,8 @@
             const element = document.getElementById(elementId);
             if (element) {
                 element.textContent = text;
-                // Get the window ID from the element ID
-                const windowId = elementId.split('-')[0];
+                const windowId = elementId.startsWith('response1') ? 'window1' : 'window2';
                 autoScroll(windowId);
-            } else {
-                console.error(`Element not found: ${elementId}`);
             }
         }
 
@@ -298,11 +315,15 @@
 
         function getFormattedDateTime() {
             const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            return `${year}-${month}-${day}, ${time}`;
+            return now.toLocaleString('en-US', { 
+                year: 'numeric', 
+                month: '2-digit', 
+                day: '2-digit',
+                hour: '2-digit', 
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true 
+            });
         }
 
         function clearChatWindows() {
@@ -407,57 +428,42 @@
             const userInput = document.getElementById("userInput").value;
             if (!userInput.trim()) return;
 
-            // Clear input field
-            document.getElementById("userInput").value = "";
-
-            // Check models and display user input
             const model1 = document.getElementById("model1").value;
             const model2 = document.getElementById("model2").value;
-            const timestamp = getFormattedDateTime();
-
-            // Add user message to history
-            conversationHistory.messages.push({
-                role: 'user',
-                content: userInput,
-                timestamp: timestamp
-            });
-
-            // Display user input in both windows
-            appendUserMessage("window1", userInput, timestamp);
-            appendUserMessage("window2", userInput, timestamp);
 
             if (!model1 || !model2) {
-                if (!model1) {
-                    appendErrorMessage("window1", "Please select a model");
-                }
-                if (!model2) {
-                    appendErrorMessage("window2", "Please select a model");
-                }
+                alert("Please select both models first!");
                 return;
             }
 
+            const timestamp = getFormattedDateTime();
+
+            // Append user message to both windows
+            appendUserMessage("window1", userInput, timestamp);
+            appendUserMessage("window2", userInput, timestamp);
+
             try {
                 const startTime = Date.now();
-                const model1 = document.getElementById("model1").value;
-                const model2 = document.getElementById("model2").value;
-
-                // Build full prompt with context
-                const fullPrompt = buildFullPrompt(userInput);
-                
                 console.log(`Using models: ${model1} and ${model2}`);
                 
-                // Start response containers
-                const response1Id = appendMessageStart("window1", model1, "bot-message");
-                const response2Id = appendMessageStart("window2", model2, "bot-message");
+                // Create message containers with unique IDs
+                const response1Id = `response1-${Date.now()}`;
+                const response2Id = `response2-${Date.now()}`;
+                
+                let response1Text = '';
+                let response2Text = '';
+                
+                // Initialize bot messages
+                appendMessageStart("window1", model1, "bot-message", response1Id);
+                appendMessageStart("window2", model2, "bot-message", response2Id);
 
-                console.log("Making API call...");
                 const response = await fetch("/get_response", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        prompt: fullPrompt,  // Send full conversation context
+                        prompt: userInput,
                         model1: model1,
                         model2: model2
                     })
@@ -467,93 +473,51 @@
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
-                console.log("Starting to read stream...");
                 const reader = response.body.getReader();
-                let responses = { response1: "", response2: "" };
-                let tokens = { response1: 0, response2: 0 };
+                let tokenCounts = { response1: 0, response2: 0 };
 
                 while (true) {
                     const {value, done} = await reader.read();
-                    if (done) {
-                        console.log("Stream complete");
-                        break;
-                    }
+                    if (done) break;
                     
                     const text = new TextDecoder().decode(value);
-                    console.log("Received chunk:", text);  // Debug log
-                    
                     const lines = text.split('\n');
                     
                     for (const line of lines) {
                         if (line.startsWith('data: ')) {
                             try {
                                 const data = JSON.parse(line.slice(6));
-                                console.log("Parsed data:", data);  // Debug log
                                 
                                 if (data.error) {
-                                    console.error("Server error:", data.error);
-                                    updateMessage(response1Id, "Error: " + data.error);
-                                    updateMessage(response2Id, "Error: " + data.error);
+                                    console.error('Error:', data.error);
                                     continue;
                                 }
-                                
-                                if (data.response1 !== undefined) {
-                                    responses.response1 = data.response1;
-                                    tokens.response1 = (data.response1.match(/\b\w+\b/g) || []).length;
-                                    updateMessage(response1Id, responses.response1);
+
+                                if (data.response1) {
+                                    response1Text += data.response1;
+                                    updateMessage(response1Id, response1Text);
+                                    tokenCounts.response1 = data.tokens1;
                                 }
-                                if (data.response2 !== undefined) {
-                                    responses.response2 = data.response2;
-                                    tokens.response2 = (data.response2.match(/\b\w+\b/g) || []).length;
-                                    updateMessage(response2Id, responses.response2);
+                                if (data.response2) {
+                                    response2Text += data.response2;
+                                    updateMessage(response2Id, response2Text);
+                                    tokenCounts.response2 = data.tokens2;
+                                }
+                                
+                                if (data.done) {
+                                    const elapsedTime = Date.now() - startTime;
+                                    appendStats(response1Id, tokenCounts.response1, elapsedTime);
+                                    appendStats(response2Id, tokenCounts.response2, elapsedTime);
                                 }
                             } catch (e) {
-                                console.error("Error parsing JSON from stream:", e, line);
+                                console.error("Error parsing SSE data:", e);
                             }
                         }
                     }
                 }
 
-                const endTime = Date.now();
-                const elapsedTime = endTime - startTime;
-
-                // Create stats strings
-                const stats1 = `Generated ${tokens.response1} tokens in ${(elapsedTime/1000).toFixed(1)}s (${(tokens.response1/(elapsedTime/1000)).toFixed(1)} tokens/sec)`;
-                const stats2 = `Generated ${tokens.response2} tokens in ${(elapsedTime/1000).toFixed(1)}s (${(tokens.response2/(elapsedTime/1000)).toFixed(1)} tokens/sec)`;
-
-                // Add responses to conversation history with stats
-                if (responses.response1) {
-                    conversationHistory.messages.push({
-                        role: 'assistant1',
-                        model: model1,
-                        content: responses.response1,
-                        timestamp: getFormattedDateTime(),
-                        stats: stats1
-                    });
-                }
-                if (responses.response2) {
-                    conversationHistory.messages.push({
-                        role: 'assistant2',
-                        model: model2,
-                        content: responses.response2,
-                        timestamp: getFormattedDateTime(),
-                        stats: stats2
-                    });
-                }
-
-                // Update the messages with stats
-                appendStats(response1Id, tokens.response1, elapsedTime);
-                appendStats(response2Id, tokens.response2, elapsedTime);
-
-                // After both responses are complete
-                if (responses.response1 && responses.response2) {
-                    await generateSummary(responses.response1, responses.response2, userInput);
-                }
-
             } catch (error) {
                 console.error("Error in sendPrompt:", error);
-                appendErrorMessage("window1", `Error: ${error.message}`);
-                appendErrorMessage("window2", `Error: ${error.message}`);
             }
         }
 
@@ -594,7 +558,6 @@
         // Add auto-scroll function
         function autoScroll(windowId) {
             const chatWindow = document.getElementById(windowId);
-            // Only auto-scroll if user hasn't scrolled up
             if (chatWindow.scrollHeight - chatWindow.scrollTop === chatWindow.clientHeight) {
                 chatWindow.scrollTop = chatWindow.scrollHeight;
             }
@@ -602,20 +565,6 @@
 
         // Add function to handle summary
         async function generateSummary(response1, response2, originalQuestion) {
-            const summaryPrompt = `I have two AI responses to the question "${originalQuestion}":
-
-Answer 1:
-${response1}
-
-Answer 2:
-${response2}
-
-Please analyze these responses and provide a natural, well-written synthesis that:
-1. Focuses on the common points between both answers
-2. Discards any contradicting or unique points
-3. Presents the information in a flowing, coherent paragraph
-4. Maintains clarity and readability`;
-
             try {
                 const response = await fetch("/get_summary", {
                     method: "POST",
@@ -623,7 +572,9 @@ Please analyze these responses and provide a natural, well-written synthesis tha
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        prompt: summaryPrompt
+                        question: originalQuestion,
+                        response1: response1,
+                        response2: response2
                     })
                 });
 
@@ -635,7 +586,7 @@ Please analyze these responses and provide a natural, well-written synthesis tha
                 let summaryText = '';
                 const summaryWindow = document.getElementById('summary-window');
                 
-                // Add styling for better readability
+                // Initialize summary window
                 summaryWindow.innerHTML = `
                     <div class="summary-header">
                         <div class="timestamp">${getFormattedDateTime()}</div>
@@ -662,15 +613,7 @@ Please analyze these responses and provide a natural, well-written synthesis tha
                                 }
                                 if (data.summary) {
                                     summaryText += data.summary;
-                                    // Clean up any JSON artifacts and format nicely
-                                    const cleanText = summaryText
-                                        .replace(/\\n/g, ' ')
-                                        .replace(/\\/g, '')
-                                        .replace(/"{/g, '')
-                                        .replace(/}"/g, '')
-                                        .replace(/["{}]/g, '')
-                                        .trim();
-                                    summaryContent.textContent = cleanText;
+                                    summaryContent.textContent = summaryText;
                                     autoScroll('summary-window');
                                 }
                             } catch (e) {
@@ -686,6 +629,65 @@ Please analyze these responses and provide a natural, well-written synthesis tha
                 `;
             }
         }
+
+        // Updated function to fetch and populate models
+        async function loadAvailableModels() {
+            try {
+                console.log('Fetching models...');
+                const response = await fetch('/get_models');
+                const data = await response.json();
+                console.log('Received data:', data);
+
+                if (!data.models) {
+                    throw new Error('No models data received');
+                }
+
+                availableModels = data.models;
+                populateModelSelectors();
+            } catch (error) {
+                console.error('Error loading models:', error);
+                // Show error on page
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.textContent = `Failed to load models: ${error.message}`;
+                document.body.insertBefore(errorDiv, document.body.firstChild);
+            }
+        }
+
+        function populateModelSelectors() {
+            const selectors = ['model1', 'model2'];
+            
+            selectors.forEach(selectorId => {
+                const select = document.getElementById(selectorId);
+                if (!select) {
+                    console.error(`Select element ${selectorId} not found`);
+                    return;
+                }
+                
+                // Clear existing options
+                select.innerHTML = '';
+                
+                // Add default option
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = 'Select Model';
+                select.appendChild(defaultOption);
+                
+                // Add model options
+                availableModels.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model;
+                    option.textContent = model;
+                    select.appendChild(option);
+                });
+            });
+        }
+
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM loaded');
+            loadAvailableModels();
+        });
     </script>
 </body>
 </html>

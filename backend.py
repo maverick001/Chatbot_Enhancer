@@ -63,14 +63,15 @@ Response 2:
 {response2}
 
 Instructions:
-1. Identify the key points that are present in both responses
-2. Synthesize these common points into a coherent summary
+1. Identify 3-5 key points that are present in both responses
+2. Synthesize these common points into a coherent summary paragraph
 3. Ignore any contradicting or unique points
 4. Keep the response concise and focused
 
+Your response MUST be in the following format:
 {format_instructions}
 
-Provide your analysis:
+Analyze the responses now:
 """
 
 # Initialize prompt template
@@ -109,11 +110,21 @@ def get_summary():
             try:
                 # Run the chain in a separate thread
                 def run_chain():
-                    chain.run(
+                    result = chain.run(
                         question=question,
                         response1=response1,
                         response2=response2
                     )
+                    # Parse the result to ensure it's in the correct format
+                    try:
+                        parsed_output = output_parser.parse(result)
+                        # Put the parsed result into the queue
+                        queue.put(json.dumps({
+                            'common_points': parsed_output['common_points'],
+                            'synthesized_summary': parsed_output['synthesized_summary']
+                        }))
+                    except Exception as e:
+                        queue.put(json.dumps({'error': f"Parsing error: {str(e)}"}))
 
                 thread = threading.Thread(target=run_chain)
                 thread.start()
@@ -122,7 +133,7 @@ def get_summary():
                 while thread.is_alive() or not queue.empty():
                     try:
                         token = queue.get(timeout=0.1)
-                        yield f"data: {json.dumps({'summary': token})}\n\n"
+                        yield f"data: {token}\n\n"
                     except:
                         continue
 

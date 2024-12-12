@@ -1,13 +1,13 @@
 from flask import Flask, request, jsonify, Response, send_from_directory
 import os
-from langchain_community.llms import Ollama
-from langchain.chains import LLMChain
+from langchain_ollama import OllamaLLM
+from langchain.chains.combine_documents.stuff import StuffDocumentsChain
 from langchain.prompts import PromptTemplate
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 from langchain_core.callbacks import BaseCallbackHandler
 from typing import Any, Dict, List
 import asyncio
-from queue import Queue
+from queue import Queue, Empty
 import threading
 import requests
 import json
@@ -30,20 +30,53 @@ class StreamingHandler(BaseCallbackHandler):
     def __init__(self, queue: Queue):
         self.queue = queue
         self.streaming_text = ""
+        app.logger.info("StreamingHandler initialized")
 
     def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
         self.streaming_text += token
-        self.queue.put(token)
+        app.logger.debug(f"New token received: {token}")
+        # Stream each token for real-time updates
+        self.queue.put(json.dumps({"token": token}))
+
+    def on_llm_end(self, response: Any, **kwargs: Any) -> None:
+        app.logger.info("LLM processing ended")
+        app.logger.info(f"Full streaming text: {self.streaming_text}")
+        
+        # Only try to parse if we have content
+        if not self.streaming_text.strip():
+            self.queue.put(json.dumps({"error": "Empty response from LLM"}))
+            return
+        
+        try:
+            # First try to parse as structured output
+            parsed_output = output_parser.parse(self.streaming_text)
+            app.logger.info(f"Successfully parsed output: {parsed_output}")
+            self.queue.put(json.dumps({
+                "final_output": {
+                    "common_points": parsed_output["common_points"],
+                    "synthesized_summary": parsed_output["synthesized_summary"]
+                }
+            }))
+        except Exception as e:
+            # If parsing fails, send the raw text as a fallback
+            app.logger.error(f"Parsing error: {str(e)}")
+            app.logger.error(f"Failed to parse text: {self.streaming_text}")
+            self.queue.put(json.dumps({
+                "final_output": {
+                    "common_points": ["Unable to parse structured output"],
+                    "synthesized_summary": self.streaming_text
+                }
+            }))
 
 # Define response schemas
 response_schemas = [
     ResponseSchema(
         name="common_points",
-        description="Key points that are present in both responses"
+        description="List of 3-5 key points found in both responses, each as a complete sentence"
     ),
     ResponseSchema(
         name="synthesized_summary",
-        description="A well-written paragraph synthesizing the common points"
+        description="A concise paragraph that synthesizes the common points"
     )
 ]
 
@@ -68,10 +101,10 @@ Instructions:
 3. Ignore any contradicting or unique points
 4. Keep the response concise and focused
 
-Your response MUST be in the following format:
+Your response MUST follow this exact format:
 {format_instructions}
 
-Analyze the responses now:
+Remember to structure your response exactly as specified above. Begin your analysis now:
 """
 
 # Initialize prompt template
@@ -83,59 +116,108 @@ prompt = PromptTemplate(
 
 @app.route("/get_summary", methods=["POST"])
 def get_summary():
+    app.logger.info("=====================================")
+    app.logger.info("SUMMARY ENDPOINT CALLED")
+    app.logger.info("=====================================")
+    
     try:
         data = request.json
         if not data:
+            app.logger.error("No data provided to summary endpoint")
             return jsonify({"error": "No data provided"}), 400
 
         question = data.get("question", "")
         response1 = data.get("response1", "")
         response2 = data.get("response2", "")
 
-        # Initialize queue for streaming
-        queue = Queue()
-        streaming_handler = StreamingHandler(queue)
+        app.logger.info(f"Received summary request with question: {question}")
+        app.logger.info(f"Response1 length: {len(response1)}")
+        app.logger.info(f"Response2 length: {len(response2)}")
 
-        # Initialize LangChain components
-        llm = Ollama(
-            model="mixtral",
-            callbacks=[streaming_handler],
-            temperature=0.5,
-            streaming=True
-        )
-        
-        chain = LLMChain(llm=llm, prompt=prompt)
+        if not response1 or not response2:
+            return jsonify({"error": "Missing responses"}), 400
+
+        # Create the prompt
+        prompt = f"""Analyze these two AI responses and find their common points:
+
+QUESTION: {question}
+
+FIRST RESPONSE:
+{response1}
+
+SECOND RESPONSE:
+{response2}
+
+Provide your analysis in this format:
+Key Common Points:
+- [Point 1]
+- [Point 2]
+- [Point 3]
+
+Summary:
+[Write a brief summary paragraph]
+
+Begin analysis:"""
 
         def generate():
             try:
-                # Run the chain in a separate thread
-                def run_chain():
-                    result = chain.run(
-                        question=question,
-                        response1=response1,
-                        response2=response2
-                    )
-                    # Parse the result to ensure it's in the correct format
-                    try:
-                        parsed_output = output_parser.parse(result)
-                        # Put the parsed result into the queue
-                        queue.put(json.dumps({
-                            'common_points': parsed_output['common_points'],
-                            'synthesized_summary': parsed_output['synthesized_summary']
-                        }))
-                    except Exception as e:
-                        queue.put(json.dumps({'error': f"Parsing error: {str(e)}"}))
+                # Use the same approach that works in get_response
+                response = requests.post(
+                    OLLAMA_API_BASE,
+                    json={
+                        "model": "llama3.1:8b-text-q6_K",
+                        "prompt": prompt,
+                        "stream": True
+                    },
+                    stream=True
+                )
 
-                thread = threading.Thread(target=run_chain)
-                thread.start()
+                accumulated_response = ""
+                for line in response.iter_lines():
+                    if line:
+                        try:
+                            json_response = json.loads(line)
+                            if 'response' in json_response:
+                                token = json_response['response']
+                                accumulated_response += token
+                                yield f"data: {json.dumps({'token': token})}\n\n"
 
-                # Stream the results
-                while thread.is_alive() or not queue.empty():
-                    try:
-                        token = queue.get(timeout=0.1)
-                        yield f"data: {token}\n\n"
-                    except:
-                        continue
+                        except json.JSONDecodeError:
+                            continue
+
+                # After all tokens are received, parse the complete response
+                try:
+                    # Split into sections
+                    sections = accumulated_response.split('\n\n')
+                    points_section = next((s for s in sections if 'Key Common Points:' in s), '')
+                    summary_section = next((s for s in sections if 'Summary:' in s), '')
+
+                    # Extract points
+                    points = [
+                        p.strip('- ').strip()
+                        for p in points_section.split('\n')
+                        if p.strip().startswith('-')
+                    ]
+
+                    # Extract summary
+                    summary = summary_section.replace('Summary:', '').strip()
+
+                    final_output = {
+                        "common_points": [p for p in points if len(p) > 10][:5],
+                        "synthesized_summary": summary if summary else "Summary not found in response"
+                    }
+
+                    yield f"data: {json.dumps({'final_output': final_output})}\n\n"
+
+                except Exception as e:
+                    app.logger.error(f"Error parsing final response: {str(e)}")
+                    error_output = {
+                        'final_output': {
+                            'common_points': ['Parsing error - sending raw response'],
+                            'synthesized_summary': accumulated_response
+                        }
+                    }
+                    yield f"data: {json.dumps(error_output)}\n\n"
 
             except Exception as e:
                 app.logger.error(f"Error in generate: {str(e)}")
@@ -144,7 +226,7 @@ def get_summary():
         return Response(generate(), mimetype='text/event-stream')
 
     except Exception as e:
-        app.logger.error(f"Unexpected error: {str(e)}")
+        app.logger.error(f"Unexpected error in get_summary: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 # Add this new route to get available models

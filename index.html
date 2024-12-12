@@ -436,27 +436,24 @@
                 return;
             }
 
-            const timestamp = getFormattedDateTime();
+            // Generate unique IDs for this conversation
+            const response1Id = `response1-${Date.now()}`;
+            const response2Id = `response2-${Date.now()}`;
 
-            // Append user message to both windows
-            appendUserMessage("window1", userInput, timestamp);
-            appendUserMessage("window2", userInput, timestamp);
+            // Add user messages to both windows
+            appendUserMessage("window1", userInput);
+            appendUserMessage("window2", userInput);
+
+            // Add empty bot messages that will be updated
+            appendMessageStart("window1", model1, "bot-message", response1Id);
+            appendMessageStart("window2", model2, "bot-message", response2Id);
+
+            let response1Text = '';
+            let response2Text = '';
+            let response1Complete = false;
+            let response2Complete = false;
 
             try {
-                const startTime = Date.now();
-                console.log(`Using models: ${model1} and ${model2}`);
-                
-                // Create message containers with unique IDs
-                const response1Id = `response1-${Date.now()}`;
-                const response2Id = `response2-${Date.now()}`;
-                
-                let response1Text = '';
-                let response2Text = '';
-                
-                // Initialize bot messages
-                appendMessageStart("window1", model1, "bot-message", response1Id);
-                appendMessageStart("window2", model2, "bot-message", response2Id);
-
                 const response = await fetch("/get_response", {
                     method: "POST",
                     headers: {
@@ -474,7 +471,6 @@
                 }
 
                 const reader = response.body.getReader();
-                let tokenCounts = { response1: 0, response2: 0 };
 
                 while (true) {
                     const {value, done} = await reader.read();
@@ -496,18 +492,18 @@
                                 if (data.response1) {
                                     response1Text += data.response1;
                                     updateMessage(response1Id, response1Text);
-                                    tokenCounts.response1 = data.tokens1;
                                 }
                                 if (data.response2) {
                                     response2Text += data.response2;
                                     updateMessage(response2Id, response2Text);
-                                    tokenCounts.response2 = data.tokens2;
                                 }
                                 
                                 if (data.done) {
-                                    const elapsedTime = Date.now() - startTime;
-                                    appendStats(response1Id, tokenCounts.response1, elapsedTime);
-                                    appendStats(response2Id, tokenCounts.response2, elapsedTime);
+                                    response1Complete = true;
+                                    response2Complete = true;
+                                    if (response1Complete && response2Complete) {
+                                        getSummary(userInput, response1Text, response2Text);
+                                    }
                                 }
                             } catch (e) {
                                 console.error("Error parsing SSE data:", e);
@@ -518,6 +514,98 @@
 
             } catch (error) {
                 console.error("Error in sendPrompt:", error);
+                updateMessage(response1Id, "Error: " + error.message);
+                updateMessage(response2Id, "Error: " + error.message);
+            }
+
+            // Clear input after sending
+            document.getElementById("userInput").value = "";
+        }
+
+        // Updated getSummary function
+        async function getSummary(question, response1, response2) {
+            try {
+                const summaryWindow = document.getElementById('summary-window');
+                summaryWindow.innerHTML = '<div class="summary-content">Generating summary...</div>'; // Loading indicator
+                
+                const response = await fetch("/get_summary", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        question: question,
+                        response1: response1,
+                        response2: response2
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const reader = response.body.getReader();
+                let summaryText = '';
+
+                while (true) {
+                    const {value, done} = await reader.read();
+                    if (done) break;
+                    
+                    const text = new TextDecoder().decode(value);
+                    const lines = text.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                console.log("Received summary data:", data); // Debug log
+                                
+                                if (data.error) {
+                                    summaryWindow.innerHTML = `
+                                        <div class="error-message">
+                                            Error generating summary: ${data.error}
+                                        </div>`;
+                                    console.error("Summary error:", data.error);
+                                    continue;
+                                }
+
+                                if (data.token) {
+                                    summaryText += data.token;
+                                    summaryWindow.innerHTML = `
+                                        <div class="summary-content">
+                                            <div class="streaming-content">${summaryText}</div>
+                                        </div>`;
+                                }
+
+                                if (data.final_output) {
+                                    console.log("Received final output:", data.final_output); // Debug log
+                                    summaryWindow.innerHTML = `
+                                        <div class="summary-content">
+                                            <h4>Common Points:</h4>
+                                            <ul>
+                                                ${data.final_output.common_points.map(point => 
+                                                    `<li>${point}</li>`).join('')}
+                                            </ul>
+                                            <h4>Synthesized Summary:</h4>
+                                            <p>${data.final_output.synthesized_summary}</p>
+                                        </div>`;
+                                }
+                            } catch (e) {
+                                console.error("Error parsing summary JSON:", e, "Raw data:", line);
+                                summaryWindow.innerHTML = `
+                                    <div class="error-message">
+                                        Error parsing summary data. Please try again.
+                                    </div>`;
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("Error in getSummary:", error);
+                document.getElementById('summary-window').innerHTML = `
+                    <div class="error-message">
+                        Error generating summary: ${error.message}
+                    </div>`;
             }
         }
 
@@ -560,73 +648,6 @@
             const chatWindow = document.getElementById(windowId);
             if (chatWindow.scrollHeight - chatWindow.scrollTop === chatWindow.clientHeight) {
                 chatWindow.scrollTop = chatWindow.scrollHeight;
-            }
-        }
-
-        // Add function to handle summary
-        async function generateSummary(response1, response2, originalQuestion) {
-            try {
-                const response = await fetch("/get_summary", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        question: originalQuestion,
-                        response1: response1,
-                        response2: response2
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const reader = response.body.getReader();
-                let summaryText = '';
-                const summaryWindow = document.getElementById('summary-window');
-                
-                // Initialize summary window
-                summaryWindow.innerHTML = `
-                    <div class="summary-header">
-                        <div class="timestamp">${getFormattedDateTime()}</div>
-                        <div class="summary-title">Synthesis of Common Points</div>
-                    </div>
-                    <div class="summary-content"></div>
-                `;
-                const summaryContent = summaryWindow.querySelector('.summary-content');
-
-                while (true) {
-                    const {value, done} = await reader.read();
-                    if (done) break;
-                    
-                    const text = new TextDecoder().decode(value);
-                    const lines = text.split('\n');
-                    
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            try {
-                                const data = JSON.parse(line.slice(6));
-                                if (data.error) {
-                                    summaryContent.innerHTML = `<div class="error-message">${data.error}</div>`;
-                                    continue;
-                                }
-                                if (data.summary) {
-                                    summaryText += data.summary;
-                                    summaryContent.textContent = summaryText;
-                                    autoScroll('summary-window');
-                                }
-                            } catch (e) {
-                                console.error("Error parsing summary JSON:", e);
-                            }
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error("Error generating summary:", error);
-                document.getElementById('summary-window').innerHTML = `
-                    <div class="error-message">Error generating summary: ${error.message}</div>
-                `;
             }
         }
 

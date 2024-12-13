@@ -1,0 +1,94 @@
+(index):709 DOM loaded
+(index):657 Fetching models...
+(index):660 Received data: {models: Array(12)}
+(index):561 Received summary data: {token: ''}
+(index):561 Received summary data: {final_output: {…}}
+(index):581 Received final output: {common_points: Array(0), synthesized_summary: 'Summary not found in response'}common_points: Array(0)length: 0[[Prototype]]: Array(0)synthesized_summary: "Summary not found in response"[[Prototype]]: Objectconstructor: ƒ Object()hasOwnProperty: ƒ hasOwnProperty()isPrototypeOf: ƒ isPrototypeOf()propertyIsEnumerable: ƒ propertyIsEnumerable()toLocaleString: ƒ toLocaleString()toString: ƒ toString()valueOf: ƒ valueOf()__defineGetter__: ƒ __defineGetter__()__defineSetter__: ƒ __defineSetter__()__lookupGetter__: ƒ __lookupGetter__()__lookupSetter__: ƒ __lookupSetter__()__proto__: (...)get __proto__: ƒ __proto__()set __proto__: ƒ __proto__()
+(index):561 Received summary data: {token: ' \n\n'}
+(index):561 Received summary data: {token: 'Key'}
+(index):561 Received summary data: {token: ' Common'}
+(index):561 Received summary data: {token: ' Points'}
+(index):561 Received summary data: {token: ':\n\n'}
+(index):561 Received summary data: {token: '-'}
+(index):561 Received summary data: {token: ' They'}
+(index):561 Received summary data: {token: ' both'}
+(index):561 Received summary data: {token: ' discussed'}
+(index):561 Received summary data: {token: ' Th'}
+(index):561 Received summary data: {token: 'ore'}
+(index):561 Received summary data: {token: 'au'}
+(index):561 Received summary data: {token: "'s"}
+(index):561 Received summary data: {token: ' life'}
+(index):561 Received summary data: {token: ' and'}
+(index):561 Received summary data: {token: ' work'}
+(index):561 Received summary data: {token: '\n'}
+(index):561 Received summary data: {token: '-'}
+(index):561 Received summary data: {token: ' They'}
+(index):561 Received summary data: {token: ' mentioned'}
+(index):561 Received summary data: {token: ' his'}
+(index):561 Received summary data: {token: ' book'}
+(index):561 Received summary data: {token: ' Wald'}
+(index):561 Received summary data: {token: 'en'}
+(index):561 Received summary data: {token: '\n\n'}
+(index):561 Received summary data: {token: 'Summary'}
+(index):561 Received summary data: {token: ':\n\n'}
+(index):561 Received summary data: {token: 'Both'}
+(index):561 Received summary data: {token: ' responses'}
+(index):561 Received summary data: {token: ' discuss'}
+(index):561 Received summary data: {token: ' Henry'}
+(index):561 Received summary data: {token: ' David'}
+(index):561 Received summary data: {token: ' Th'}
+(index):561 Received summary data: {token: 'ore'}
+(index):561 Received summary data: {token: 'au'}
+(index):561 Received summary data: {token: "'s"}
+(index):561 Received summary data: {token: ' life'}
+(index):561 Received summary data: {token: ' and'}
+(index):561 Received summary data: {token: ' work'}
+(index):561 Received summary data: {token: ','}
+(index):561 Received summary data: {token: ' specifically'}
+(index):561 Received summary data: {token: ' mentioning'}
+(index):561 Received summary data: {token: ' his'}
+(index):561 Received summary data: {token: ' book'}
+(index):561 Received summary data: {token: ' Wald'}
+(index):561 Received summary data: {token: 'en'}
+(index):561 Received summary data: {token: '.'}
+(index):561 Received summary data: {token: ' They'}
+(index):561 Received summary data: {token: ' highlight'}
+(index):561 Received summary data: {token: ' some'}
+(index):561 Received summary data: {token: ' key'}
+(index):561 Received summary data: {token: ' points'}
+(index):561 Received summary data: {token: ' such'}
+(index):561 Received summary data: {token: ' as'}
+(index):561 Received summary data: {token: ' living'}
+(index):561 Received summary data: {token: ' simply'}
+(index):561 Received summary data: {token: ','}
+(index):561 Received summary data: {token: ' questioning'}
+(index):561 Received summary data: {token: ' societal'}
+(index):561 Received summary data: {token: ' norms'}
+(index):561 Received summary data: {token: ','}
+(index):561 Received summary data: {token: ' and'}
+(index):561 Received summary data: {token: ' self'}
+(index):561 Received summary data: {token: '-s'}
+(index):561 Received summary data: {token: 'uff'}
+(index):561 Received summary data: {token: 'iciency'}
+(index):561 Received summary data: {token: '.'}
+(index):561 Received summary data: {token: ' Both'}
+(index):561 Received summary data: {token: ' also'}
+(index):561 Received summary data: {token: ' make'}
+(index):561 Received summary data: {token: ' brief'}
+(index):561 Received summary data: {token: ' comparisons'}
+(index):561 Received summary data: {token: ' to'}
+(index):561 Received summary data: {token: ' environmental'}
+(index):561 Received summary data: {token: 'ism'}
+(index):561 Received summary data: {token: ' and'}
+(index):561 Received summary data: {token: ' civil'}
+(index):561 Received summary data: {token: ' disobed'}
+(index):561 Received summary data: {token: 'ience'}
+(index):561 Received summary data: {token: ' movements'}
+(index):561 Received summary data: {token: ' influenced'}
+(index):561 Received summary data: {token: ' by'}
+(index):561 Received summary data: {token: ' his'}
+(index):561 Received summary data: {token: ' ideas'}
+(index):561 Received summary data: {token: '.\n'}
+(index):561 Received summary data: {token: ''}
+(index):561 Received summary data: {final_output: {…}}
+(index):581 Received final output: {common_points: Array(0), synthesized_summary: 'Summary not found in response'}

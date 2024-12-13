@@ -578,16 +578,16 @@
                                 }
 
                                 if (data.final_output) {
-                                    console.log("Received final output:", data.final_output); // Debug log
+                                    const finalOutput = data.final_output;
                                     summaryWindow.innerHTML = `
                                         <div class="summary-content">
-                                            <h4>Common Points:</h4>
+                                            <h4>Key Common Points:</h4>
                                             <ul>
-                                                ${data.final_output.common_points.map(point => 
+                                                ${finalOutput.common_points.map(point => 
                                                     `<li>${point}</li>`).join('')}
                                             </ul>
                                             <h4>Synthesized Summary:</h4>
-                                            <p>${data.final_output.synthesized_summary}</p>
+                                            <p>${finalOutput.synthesized_summary}</p>
                                         </div>`;
                                 }
                             } catch (e) {

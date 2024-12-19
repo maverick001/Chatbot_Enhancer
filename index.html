@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>LLM Playground</title>
+    <title>Chatbot Enhancer</title>
     <style>
         body {
             margin: 0;
@@ -27,20 +27,24 @@
         .chat-windows {
             display: flex;
             justify-content: space-between;
+            gap: 20px;
             width: 100%;
+            flex-wrap: wrap;
         }
 
         .chat-window {
+            flex: 1;
+            min-width: 300px;
+            max-width: calc(33% - 20px);
+            height: 500px;
             border: 1px solid #90cdf4;
             border-radius: 10px;
             padding: 20px;
-            width: 45%;
-            height: 500px;  /* Fixed height */
             overflow-y: auto;
-            scroll-behavior: smooth;  /* Smooth scrolling */
+            scroll-behavior: smooth;
             background-color: rgba(255, 255, 255, 0.9);
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            font-size: 1.2em;  /* Makes all text in chat windows 20% larger */
+            font-size: 1.2em;
         }
 
         .input-container {
@@ -115,18 +119,17 @@
 
         .stats {
             font-size: 0.8em;
-            color: #e53e3e !important;  /* Added !important to ensure the red color is applied */
+            color: #e53e3e !important;
             margin-top: 5px;
             font-style: italic;
         }
 
-        /* Alternative specific selector if you want to avoid !important */
         .chat-window .stats {
             color: #e53e3e;
         }
 
         .timestamp {
-            font-size: 0.64em;  /* Made 20% smaller (0.8 * 0.8 = 0.64) */
+            font-size: 0.64em;
             color: #993366;
             margin-bottom: 2px;
             font-style: italic;
@@ -140,14 +143,19 @@
 
         .model-selectors {
             display: flex;
-            justify-content: space-around;
+            justify-content: space-between;
             margin: 20px 0;
             width: 100%;
+            padding: 0;
         }
 
         .model-selector {
-            width: 45%;  /* Match chat window width */
+            width: calc(33% - 20px);
             text-align: center;
+        }
+
+        .model-selector-spacer {
+            width: calc(33% - 20px);
         }
 
         select {
@@ -190,14 +198,16 @@
         }
 
         .summary-window {
-            width: 100%;
-            height: 250px;
+            flex: 1;
+            min-width: 300px;
+            max-width: calc(33% - 20px);
+            height: 500px;
             border: 2px solid #90cdf4;
             border-radius: 8px;
             padding: 15px;
             overflow-y: auto;
-            background-color: #f8fafc;
-            margin-top: 20px;
+            background-color: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .summary-title {
@@ -246,27 +256,34 @@
     </style>
 </head>
 <body>
-    <h1>LLM Playground</h1>
-    <div class="select-instruction">Please select LLMs</div>
+    <h1>Chatbot Enhancer</h1>
+    <div class="select-instruction">Summarized Answer</div>
     
     <div class="controls">
         <div class="model-selectors">
-            <select id="model1" class="model-dropdown">
-                <option value="">Select Model 1</option>
-            </select>
-            <select id="model2" class="model-dropdown">
-                <option value="">Select Model 2</option>
-            </select>
+            <div class="model-selector">
+                <select id="model1" class="model-dropdown">
+                    <option value="">Select Model 1</option>
+                </select>
+            </div>
+            <div class="model-selector-spacer"></div>
+            <div class="model-selector">
+                <select id="model2" class="model-dropdown">
+                    <option value="">Select Model 2</option>
+                </select>
+            </div>
         </div>
     </div>
 
     <div class="container">
         <div class="chat-windows">
             <div class="chat-window" id="window1"></div>
+            <div class="summary-window" id="summary-window">
+                <div class="summary-title">Common Ground Summary</div>
+                <div class="summary-content"></div>
+            </div>
             <div class="chat-window" id="window2"></div>
         </div>
-        <div class="summary-title">Common Ground Summary</div>
-        <div class="summary-window" id="summary-window"></div>
     </div>
     <div class="input-container">
         <input type="text" id="userInput" placeholder="Enter your prompt">

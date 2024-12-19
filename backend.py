@@ -262,10 +262,10 @@ def favicon():
 def get_response():
     try:
         data = request.json
-        TOKEN_LIMIT = 200
+        TOKEN_LIMIT = 250
 
         # Add system prompt for concise responses
-        SYSTEM_PROMPT = """Please provide clear and concise responses within 200 tokens. 
+        SYSTEM_PROMPT = """Please provide clear and concise responses around 200 tokens. 
         Focus on the most important information and be direct in your answers. 
         If a longer response is needed, prioritize the most crucial points first.
         In no chance shall an answer be longer than 250 tokens."""
@@ -301,7 +301,7 @@ def get_response():
                                 yield f"data: {json.dumps({'response1': response_text, 'tokens1': tokens['response1']})}\n\n"
                                 
                                 if tokens["response1"] >= TOKEN_LIMIT:
-                                    message = json.dumps({'response1': '\n[Token limit reached: 200]', 'tokens1': tokens['response1']})
+                                    message = json.dumps({'response1': '\n[Token limit reached: 250]', 'tokens1': tokens['response1']})
                                     yield f"data: {message}\n\n"
                                     break
                         except json.JSONDecodeError:
@@ -330,7 +330,7 @@ def get_response():
                                 yield f"data: {json.dumps({'response2': response_text, 'tokens2': tokens['response2']})}\n\n"
                                 
                                 if tokens["response2"] >= TOKEN_LIMIT:
-                                    message = json.dumps({'response2': '\n[Token limit reached: 200]', 'tokens2': tokens['response2']})
+                                    message = json.dumps({'response2': '\n[Token limit reached: 250]', 'tokens2': tokens['response2']})
                                     yield f"data: {message}\n\n"
                                     break
                         except json.JSONDecodeError:

@@ -171,30 +171,22 @@
         .select-instruction {
             text-align: center;
             color: #4a5568;
-            margin: 10px 0;
             font-size: 1.1em;
             font-style: italic;
+            width: calc(33% - 20px);
         }
 
-        .model-selectors {
+        .instructions-container {
             display: flex;
-            justify-content: space-around;
-            margin: 20px 0;
+            justify-content: space-between;
             width: 100%;
+            margin: 0 0 20px 0;
+            position: relative;
+            top: 28px;
         }
 
-        .model-selector {
-            width: 45%;
-        }
-
-        select {
-            width: 100%;
-            padding: 8px;
-            font-size: 16px;
-            border: 2px solid #90cdf4;
-            border-radius: 8px;
-            background-color: white;
-            max-width: 300px;
+        .instruction-spacer {
+            width: calc(33% - 20px);
         }
 
         .summary-window {
@@ -257,7 +249,11 @@
 </head>
 <body>
     <h1>Chatbot Enhancer</h1>
-    <div class="select-instruction">Summarized Answer</div>
+    <div class="instructions-container">
+        <div class="instruction-spacer"></div>
+        <div class="select-instruction">Synthesized Answer</div>
+        <div class="instruction-spacer"></div>
+    </div>
     
     <div class="controls">
         <div class="model-selectors">
@@ -543,7 +539,7 @@
         async function getSummary(question, response1, response2) {
             try {
                 const summaryWindow = document.getElementById('summary-window');
-                summaryWindow.innerHTML = '<div class="summary-content">Generating summary...</div>'; // Loading indicator
+                summaryWindow.innerHTML = '<div class="summary-content">Generating summary...</div>';
                 
                 const response = await fetch("/get_summary", {
                     method: "POST",
@@ -563,6 +559,7 @@
 
                 const reader = response.body.getReader();
                 let summaryText = '';
+                let finalOutputReceived = false;
 
                 while (true) {
                     const {value, done} = await reader.read();
@@ -575,19 +572,20 @@
                         if (line.startsWith('data: ')) {
                             try {
                                 const data = JSON.parse(line.slice(6));
-                                console.log("Received summary data:", data); // Debug log
+                                console.log("Received data:", data); // Detailed logging
                                 
                                 if (data.error) {
+                                    console.error("Error in data:", data.error);
                                     summaryWindow.innerHTML = `
                                         <div class="error-message">
                                             Error generating summary: ${data.error}
                                         </div>`;
-                                    console.error("Summary error:", data.error);
                                     continue;
                                 }
 
-                                if (data.token) {
+                                if (data.token && !finalOutputReceived) {
                                     summaryText += data.token;
+                                    console.log("Current summary text:", summaryText); // Log accumulated text
                                     summaryWindow.innerHTML = `
                                         <div class="summary-content">
                                             <div class="streaming-content">${summaryText}</div>
@@ -595,27 +593,44 @@
                                 }
 
                                 if (data.final_output) {
+                                    console.log("Received final output:", data.final_output); // Log final output
+                                    finalOutputReceived = true;
                                     const finalOutput = data.final_output;
-                                    summaryWindow.innerHTML = `
-                                        <div class="summary-content">
-                                            <h4>Key Common Points:</h4>
-                                            <ul>
-                                                ${finalOutput.common_points.map(point => 
-                                                    `<li>${point}</li>`).join('')}
-                                            </ul>
-                                            <h4>Synthesized Summary:</h4>
-                                            <p>${finalOutput.synthesized_summary}</p>
-                                        </div>`;
+                                    
+                                    // Check if we have valid content
+                                    if (finalOutput.common_points && finalOutput.common_points.length > 0 && 
+                                        finalOutput.synthesized_summary) {
+                                        summaryWindow.innerHTML = `
+                                            <div class="summary-content">
+                                                <h4>Key Common Points:</h4>
+                                                <ul>
+                                                    ${finalOutput.common_points.map(point => 
+                                                        `<li>${point}</li>`).join('')}
+                                                </ul>
+                                                <h4>Synthesized Summary:</h4>
+                                                <p>${finalOutput.synthesized_summary}</p>
+                                            </div>`;
+                                    } else {
+                                        console.error("Invalid final output structure:", finalOutput);
+                                        summaryWindow.innerHTML = `
+                                            <div class="summary-content">
+                                                <p>${summaryText}</p>
+                                            </div>`;
+                                    }
+                                    break;
                                 }
                             } catch (e) {
-                                console.error("Error parsing summary JSON:", e, "Raw data:", line);
-                                summaryWindow.innerHTML = `
-                                    <div class="error-message">
-                                        Error parsing summary data. Please try again.
-                                    </div>`;
+                                console.error("Error parsing JSON:", e, "Raw line:", line);
+                                if (!finalOutputReceived) {
+                                    summaryWindow.innerHTML = `
+                                        <div class="error-message">
+                                            Error parsing summary data. Please try again.
+                                        </div>`;
+                                }
                             }
                         }
                     }
+                    if (finalOutputReceived) break;
                 }
             } catch (error) {
                 console.error("Error in getSummary:", error);

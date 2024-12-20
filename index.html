@@ -572,7 +572,6 @@
                         if (line.startsWith('data: ')) {
                             try {
                                 const data = JSON.parse(line.slice(6));
-                                console.log("Received data:", data); // Detailed logging
                                 
                                 if (data.error) {
                                     console.error("Error in data:", data.error);
@@ -580,24 +579,21 @@
                                         <div class="error-message">
                                             Error generating summary: ${data.error}
                                         </div>`;
-                                    continue;
+                                    return; // Exit if there's an error
                                 }
 
                                 if (data.token && !finalOutputReceived) {
                                     summaryText += data.token;
-                                    console.log("Current summary text:", summaryText); // Log accumulated text
                                     summaryWindow.innerHTML = `
                                         <div class="summary-content">
                                             <div class="streaming-content">${summaryText}</div>
                                         </div>`;
                                 }
 
-                                if (data.final_output) {
-                                    console.log("Received final output:", data.final_output); // Log final output
+                                if (data.final_output && !finalOutputReceived) {
                                     finalOutputReceived = true;
                                     const finalOutput = data.final_output;
                                     
-                                    // Check if we have valid content
                                     if (finalOutput.common_points && finalOutput.common_points.length > 0 && 
                                         finalOutput.synthesized_summary) {
                                         summaryWindow.innerHTML = `
@@ -610,14 +606,8 @@
                                                 <h4>Synthesized Summary:</h4>
                                                 <p>${finalOutput.synthesized_summary}</p>
                                             </div>`;
-                                    } else {
-                                        console.error("Invalid final output structure:", finalOutput);
-                                        summaryWindow.innerHTML = `
-                                            <div class="summary-content">
-                                                <p>${summaryText}</p>
-                                            </div>`;
+                                        return; // Exit after displaying final output
                                     }
-                                    break;
                                 }
                             } catch (e) {
                                 console.error("Error parsing JSON:", e, "Raw line:", line);
@@ -630,6 +620,7 @@
                             }
                         }
                     }
+                    // Break the while loop if final output has been received
                     if (finalOutputReceived) break;
                 }
             } catch (error) {

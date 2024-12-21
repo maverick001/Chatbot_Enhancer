@@ -15,7 +15,7 @@ A web application that allows you to compare responses from different LLM models
 
 ## Prerequisites
 
-- Python 3.x
+- Python 3.10
 - Flask
 - Ollama installed and running locally
 - Required Python packages (see requirements.txt)
@@ -25,6 +25,7 @@ A web application that allows you to compare responses from different LLM models
 1. Clone the repository:
 
 git clone https://github.com/maverick001/chatbot-enhancer.git
+
 cd chatbot-enhancer
 
 

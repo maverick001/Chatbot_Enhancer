@@ -302,6 +302,7 @@
                 <div class="timestamp">${timestamp}</div>
                 <span class="sender-name">${sender}:</span> 
                 <span class="message-content" id="${messageId}"></span>
+                <div class="stats" id="stats-${messageId}"></div>
             `;
             document.getElementById(windowId).appendChild(div);
             return messageId;
@@ -467,6 +468,11 @@
             let response1Complete = false;
             let response2Complete = false;
 
+            let startTime1 = Date.now();
+            let startTime2 = Date.now();
+            let tokens1 = 0;
+            let tokens2 = 0;
+
             try {
                 const response = await fetch("/get_response", {
                     method: "POST",
@@ -505,11 +511,15 @@
 
                                 if (data.response1) {
                                     response1Text += data.response1;
+                                    tokens1++;
                                     updateMessage(response1Id, response1Text);
+                                    updateStats('stats-' + response1Id, tokens1, Date.now() - startTime1);
                                 }
                                 if (data.response2) {
                                     response2Text += data.response2;
+                                    tokens2++;
                                     updateMessage(response2Id, response2Text);
+                                    updateStats('stats-' + response2Id, tokens2, Date.now() - startTime2);
                                 }
                                 
                                 if (data.done) {
@@ -733,6 +743,26 @@
             console.log('DOM loaded');
             loadAvailableModels();
         });
+
+        // Add this new function to update stats
+        function updateStats(statsId, tokens, elapsedTime) {
+            const statsElement = document.getElementById(statsId);
+            if (!statsElement) {
+                const messageElement = document.getElementById(statsId.replace('stats-', ''));
+                if (messageElement) {
+                    const statsDiv = document.createElement('div');
+                    statsDiv.id = statsId;
+                    statsDiv.className = 'stats';
+                    messageElement.parentElement.appendChild(statsDiv);
+                }
+            }
+            
+            if (document.getElementById(statsId)) {
+                const tokensPerSecond = (tokens / (elapsedTime / 1000)).toFixed(1);
+                document.getElementById(statsId).textContent = 
+                    `Generated ${tokens} tokens in ${(elapsedTime/1000).toFixed(1)}s (${tokensPerSecond} tokens/sec)`;
+            }
+        }
     </script>
 </body>
 </html>

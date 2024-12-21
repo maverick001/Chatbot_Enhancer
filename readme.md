@@ -8,10 +8,10 @@ This is a web application that allows you to compare responses from 2 different 
 
 ## Features
 
-- **Dual Model Comparison**: Compare responses from two different LLM models simultaneously
-- **Real-time Streaming**: Watch responses generate in real-time
+- **Model Selection**: Choose from available Ollama models via dropdown menus.
+- **Dual Model Comparison**: Compare the responses from two different LLM models for same prompt side by side.
+- **Token Generation Rate**: Show token generation rate for each model response to let user compare LLM performance.
 - **Automatic Synthesis**: Automatically identifies and summarizes common points between 2 responses with a third LLM that is specialized in text analysis and summarization. 
-- **Model Selection**: Choose from available Ollama models via dropdown menus
 - **Token Management**: Use system prompt to enforces a 300-token limit for consistent, concise responses
 - **Clean Interface**: Simple, intuitive UI for easy interaction
 

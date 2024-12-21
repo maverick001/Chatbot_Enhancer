@@ -8,9 +8,9 @@ A web application that allows you to compare responses from different LLM models
 
 - **Dual Model Comparison**: Compare responses from two different LLM models simultaneously
 - **Real-time Streaming**: Watch responses generate in real-time
-- **Automatic Synthesis**: Automatically identifies and summarizes common points between responses
+- **Automatic Synthesis**: Automatically identifies and summarizes common points between 2 responses with a third LLM
 - **Model Selection**: Choose from available Ollama models via dropdown menus
-- **Token Management**: Enforces a 300-token limit for consistent, concise responses
+- **Token Management**: Use system prompt to enforces a 300-token limit for consistent, concise responses
 - **Clean Interface**: Simple, intuitive UI for easy interaction
 
 ## Prerequisites
@@ -26,19 +26,19 @@ A web application that allows you to compare responses from different LLM models
 
 git clone https://github.com/maverick001/chatbot-enhancer.git
 
-cd chatbot-enhancer
+    cd chatbot-enhancer
 
 
 2. Install dependencies:
 
-pip install -r requirements.txt
+    pip install -r requirements.txt
 
 
 3. Make sure Ollama is running locally on port 11434
 
 4. Start the Flask server:
 
-python backend.py
+    python backend.py
 
 
 5. Open your browser and navigate to:

@@ -11,8 +11,14 @@ from queue import Queue, Empty
 import threading
 import requests
 import json
+import logging
 
+logging.basicConfig(level=logging.DEBUG)
+
+# Create Flask app first
 app = Flask(__name__, static_folder='.')
+app.logger.setLevel(logging.DEBUG)
+
 OLLAMA_API_BASE = "http://localhost:11434/api/generate"
 OLLAMA_GPU_CONFIG = {
     "options": {

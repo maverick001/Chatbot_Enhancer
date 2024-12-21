@@ -14,6 +14,16 @@ import json
 
 app = Flask(__name__, static_folder='.')
 OLLAMA_API_BASE = "http://localhost:11434/api/generate"
+OLLAMA_GPU_CONFIG = {
+    "options": {
+        "gpu": True,  # Enable GPU
+        "numa": False,  # Disable NUMA for Windows
+        "batch": 1,  # Start with batch size 1
+        "threads": 4,  # Number of CPU threads as fallback
+        "context_size": 4096,  # Context window size
+        "seed": 42  # For reproducibility
+    }
+}
 
 # Serve index.html at root
 @app.route('/')
@@ -161,13 +171,13 @@ Begin analysis:"""
 
         def generate():
             try:
-                # Use the same approach that works in get_response
                 response = requests.post(
                     OLLAMA_API_BASE,
                     json={
-                        "model": "llama3.1:8b-text-q6_K",
+                        "model": "gemma2:9b-instruct-q6_k",
                         "prompt": prompt,
-                        "stream": True
+                        "stream": True,
+                        **OLLAMA_GPU_CONFIG
                     },
                     stream=True
                 )
@@ -278,14 +288,15 @@ def get_response():
                 responses = {"response1": "", "response2": ""}
                 tokens = {"response1": 0, "response2": 0}
 
-                # Model 1 response with system prompt
+                # Model 1 response with GPU config
                 response1 = requests.post(
                     OLLAMA_API_BASE,
                     json={
                         "model": data['model1'],
                         "prompt": combined_prompt,
-                        "system": SYSTEM_PROMPT,  # Add system prompt to Ollama context
-                        "stream": True
+                        "system": SYSTEM_PROMPT,
+                        "stream": True,
+                        **OLLAMA_GPU_CONFIG
                     },
                     stream=True
                 )
@@ -307,14 +318,15 @@ def get_response():
                         except json.JSONDecodeError:
                             continue
 
-                # Model 2 response with system prompt
+                # Model 2 response with GPU config
                 response2 = requests.post(
                     OLLAMA_API_BASE,
                     json={
                         "model": data['model2'],
                         "prompt": combined_prompt,
-                        "system": SYSTEM_PROMPT,  # Add system prompt to Ollama context
-                        "stream": True
+                        "system": SYSTEM_PROMPT,
+                        "stream": True,
+                        **OLLAMA_GPU_CONFIG
                     },
                     stream=True
                 )

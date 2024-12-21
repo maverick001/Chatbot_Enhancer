@@ -1,6 +1,8 @@
 # Chatbot Enhancer
 
-A web application that allows you to compare responses from different LLM models side by side and synthesize their common points. This tool helps users better understand and analyze AI model outputs by highlighting key similarities and differences between responses.
+This is a web application that allows you to compare responses from 2 different LLM models side by side, and then summarize their common points into a synthesized answer. With this method, it can allelivate the effect of signle model's hullicinaiton and give you a more accurate answer to your prompt.
+
+
 
 ![Chatbot Enhancer Interface](screenshots/interface.png)
 
@@ -8,7 +10,7 @@ A web application that allows you to compare responses from different LLM models
 
 - **Dual Model Comparison**: Compare responses from two different LLM models simultaneously
 - **Real-time Streaming**: Watch responses generate in real-time
-- **Automatic Synthesis**: Automatically identifies and summarizes common points between 2 responses with a third LLM
+- **Automatic Synthesis**: Automatically identifies and summarizes common points between 2 responses with a third LLM that is specialized in text analysis and summarization. 
 - **Model Selection**: Choose from available Ollama models via dropdown menus
 - **Token Management**: Use system prompt to enforces a 300-token limit for consistent, concise responses
 - **Clean Interface**: Simple, intuitive UI for easy interaction
